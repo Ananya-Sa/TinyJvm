@@ -15,9 +15,13 @@ typedef enum {
     AST_RETURN,
     AST_VAR_DECL,
     AST_EXPR_STMT,
+    AST_ASSIGN,
+    AST_INC,
     AST_BIN,
     AST_INT_LIT,
+    AST_STRING_LIT,
     AST_IDENT,
+    AST_CALL,
     AST_NEW
 } AstKind;
 
@@ -65,6 +69,13 @@ struct Ast {
             Ast *expr;
         } expr_stmt;
         struct {
+            Str name;
+            Ast *value;
+        } assign;
+        struct {
+            Str name;
+        } inc;
+        struct {
             TokenType op;
             Ast *lhs;
             Ast *rhs;
@@ -73,8 +84,15 @@ struct Ast {
             int value;
         } int_lit;
         struct {
+            Str value;
+        } string_lit;
+        struct {
             Str name;
         } ident;
+        struct {
+            Str callee;
+            Ast *args;
+        } call;
         struct {
             Str class_name;
         } new_expr;

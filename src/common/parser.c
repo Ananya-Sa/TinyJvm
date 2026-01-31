@@ -53,6 +53,7 @@ static Token ps_peek(Parser *ps) {
 }
 
 static Ast *parse_expr(Parser *ps);
+static Ast *parse_call_args(Parser *ps);
 
 static Ast *parse_primary(Parser *ps) {
     Token t = ps->current;
@@ -66,10 +67,42 @@ static Ast *parse_primary(Parser *ps) {
         node->as.int_lit.value = value;
         return node;
     }
+    if (ps_match(ps, TOK_STRING_LIT)) {
+        Ast *node = ast_new(ps, AST_STRING_LIT, t);
+        if (!node) return NULL;
+        Str s;
+        s.data = t.start + 1;
+        s.len = t.len >= 2 ? t.len - 2 : 0;
+        node->as.string_lit.value = s;
+        return node;
+    }
     if (ps_match(ps, TOK_IDENT)) {
+        size_t start = t.pos;
+        size_t end = t.pos + t.len;
+        int dotted = 0;
+        while (ps_match(ps, TOK_DOT)) {
+            Token part = ps_expect(ps, TOK_IDENT, "expected identifier after '.'");
+            dotted = 1;
+            end = part.pos + part.len;
+        }
+        Str name;
+        name.data = ps->lx.src + start;
+        name.len = end - start;
+        if (ps_match(ps, TOK_LPAREN)) {
+            Ast *call = ast_new(ps, AST_CALL, t);
+            if (!call) return NULL;
+            call->as.call.callee = name;
+            call->as.call.args = parse_call_args(ps);
+            ps_expect(ps, TOK_RPAREN, "expected ')' after call arguments");
+            return call;
+        }
+        if (dotted) {
+            diag_error(ps->diag, t.pos, "expected '(' after qualified name");
+            return NULL;
+        }
         Ast *node = ast_new(ps, AST_IDENT, t);
         if (!node) return NULL;
-        node->as.ident.name = token_text(t);
+        node->as.ident.name = name;
         return node;
     }
     if (ps_match(ps, TOK_KW_NEW)) {
@@ -90,6 +123,27 @@ static Ast *parse_primary(Parser *ps) {
     return NULL;
 }
 
+static Ast *parse_call_args(Parser *ps) {
+    if (ps->current.type == TOK_RPAREN) {
+        return NULL;
+    }
+    Ast *head = NULL;
+    Ast *tail = NULL;
+    for (;;) {
+        Ast *arg = parse_expr(ps);
+        if (!head) {
+            head = tail = arg;
+        } else if (tail) {
+            tail->next = arg;
+            tail = arg;
+        }
+        if (!ps_match(ps, TOK_COMMA)) {
+            break;
+        }
+    }
+    return head;
+}
+
 static int bin_prec(TokenType type) {
     switch (type) {
         case TOK_PLUS:
@@ -97,6 +151,7 @@ static int bin_prec(TokenType type) {
             return 10;
         case TOK_STAR:
         case TOK_SLASH:
+        case TOK_PERCENT:
             return 20;
         default:
             return 0;
@@ -156,6 +211,30 @@ static Str parse_type(Parser *ps) {
 static Ast *parse_block(Parser *ps);
 
 static Ast *parse_statement(Parser *ps) {
+    if (ps->current.type == TOK_IDENT) {
+        Token ident = ps->current;
+        Token next = ps_peek(ps);
+        if (next.type == TOK_EQ) {
+            ps_advance(ps);
+            ps_expect(ps, TOK_EQ, "expected '=' in assignment");
+            Ast *value = parse_expr(ps);
+            ps_expect(ps, TOK_SEMI, "expected ';' after assignment");
+            Ast *node = ast_new(ps, AST_ASSIGN, ident);
+            if (!node) return NULL;
+            node->as.assign.name = token_text(ident);
+            node->as.assign.value = value;
+            return node;
+        }
+        if (next.type == TOK_PLUS_PLUS) {
+            ps_advance(ps);
+            ps_expect(ps, TOK_PLUS_PLUS, "expected '++'");
+            ps_expect(ps, TOK_SEMI, "expected ';' after increment");
+            Ast *node = ast_new(ps, AST_INC, ident);
+            if (!node) return NULL;
+            node->as.inc.name = token_text(ident);
+            return node;
+        }
+    }
     if (ps_match(ps, TOK_KW_RETURN)) {
         Token t = ps->current;
         Ast *expr = NULL;

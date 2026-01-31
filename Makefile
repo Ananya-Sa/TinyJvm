@@ -15,7 +15,8 @@ SRC_COMMON := \
   src/common/diag.c \
   src/common/lexer.c \
   src/common/parser.c \
-  src/common/str.c
+  src/common/str.c \
+  src/common/type_check.c
 
 SRC_JAVAC := \
   src/javac/main.c \

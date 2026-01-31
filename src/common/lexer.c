@@ -99,6 +99,22 @@ Token lexer_next(Lexer *lx) {
         return make_token(lx, TOK_INT_LIT, start, lx->pos);
     }
 
+    if (c == '"') {
+        while (lx->pos < lx->len && lx->src[lx->pos] != '"') {
+            if (lx->src[lx->pos] == '\n') {
+                diag_error(lx->diag, start, "unterminated string literal");
+                return make_token(lx, TOK_EOF, lx->pos, lx->pos);
+            }
+            lx->pos++;
+        }
+        if (lx->pos >= lx->len) {
+            diag_error(lx->diag, start, "unterminated string literal");
+            return make_token(lx, TOK_EOF, lx->pos, lx->pos);
+        }
+        lx->pos++; /* closing quote */
+        return make_token(lx, TOK_STRING_LIT, start, lx->pos);
+    }
+
     switch (c) {
         case '{': return make_token(lx, TOK_LBRACE, start, lx->pos);
         case '}': return make_token(lx, TOK_RBRACE, start, lx->pos);
@@ -110,10 +126,16 @@ Token lexer_next(Lexer *lx) {
         case ',': return make_token(lx, TOK_COMMA, start, lx->pos);
         case '.': return make_token(lx, TOK_DOT, start, lx->pos);
         case '=': return make_token(lx, TOK_EQ, start, lx->pos);
-        case '+': return make_token(lx, TOK_PLUS, start, lx->pos);
+        case '+':
+            if (lx->pos < lx->len && lx->src[lx->pos] == '+') {
+                lx->pos++;
+                return make_token(lx, TOK_PLUS_PLUS, start, lx->pos);
+            }
+            return make_token(lx, TOK_PLUS, start, lx->pos);
         case '-': return make_token(lx, TOK_MINUS, start, lx->pos);
         case '*': return make_token(lx, TOK_STAR, start, lx->pos);
         case '/': return make_token(lx, TOK_SLASH, start, lx->pos);
+        case '%': return make_token(lx, TOK_PERCENT, start, lx->pos);
         default:
             diag_error(lx->diag, start, "unexpected character '%c'", c);
             return make_token(lx, TOK_EOF, lx->pos, lx->pos);

@@ -8,6 +8,7 @@ typedef enum {
     TOK_EOF = 0,
     TOK_IDENT,
     TOK_INT_LIT,
+    TOK_STRING_LIT,
 
     TOK_KW_CLASS,
     TOK_KW_PUBLIC,
@@ -29,9 +30,11 @@ typedef enum {
     TOK_DOT,
     TOK_EQ,
     TOK_PLUS,
+    TOK_PLUS_PLUS,
     TOK_MINUS,
     TOK_STAR,
-    TOK_SLASH
+    TOK_SLASH,
+    TOK_PERCENT
 } TokenType;
 
 typedef struct {
